@@ -5,6 +5,7 @@ import {
   loadHandle,
   saveHandle,
   sanitizeHandle,
+  submitDailyScore,
   type LeaderboardRow,
 } from "@/lib/daily-leaderboard";
 
@@ -37,7 +38,24 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
 
   function commitHandle() {
     const clean = saveHandle(draftHandle);
-    if (clean) setHandleState(clean);
+    if (!clean) return;
+    setHandleState(clean);
+    // If the player has a local best for today, retroactively post it now —
+    // they may have just finished a run and gotten kicked here without a
+    // handle, so without this their score never reaches the leaderboard.
+    if (yourEntry && yourEntry.best > 0) {
+      void submitDailyScore({
+        day: date,
+        handle: clean,
+        score: yourEntry.best,
+        wave: yourEntry.bestWave,
+      }).then((res) => {
+        if (res.ok) {
+          // Refresh the rankings so the just-posted score shows up.
+          void fetchTopDaily(date).then(setRows).catch(() => undefined);
+        }
+      });
+    }
   }
 
   const yourRank = rows

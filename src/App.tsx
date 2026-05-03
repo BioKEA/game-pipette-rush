@@ -562,6 +562,10 @@ function App() {
       // Submit to shared leaderboard whenever a handle is set, regardless
       // of personal-best — Supabase de-dupes by score on read; the rate-
       // limit trigger guards against runaway inserts.
+      //
+      // If the player hasn't set a handle yet, kick them to the daily-board
+      // phase so they're prompted; otherwise the score would silently never
+      // post (which is exactly what was happening before the audit).
       const handle = loadHandle();
       if (handle && state.score > 0) {
         void submitDailyScore({
@@ -570,6 +574,10 @@ function App() {
           score: state.score,
           wave: state.wave,
         });
+      } else if (!handle && state.score > 0) {
+        setTimeout(() => {
+          setState((s) => (s.phase === "gameover" ? { ...s, phase: "daily-board" } : s));
+        }, 1500);
       }
       // Check daily-podium achievement (computed against opponent set)
       // Use the same generator as DailyLeaderboard for consistency
