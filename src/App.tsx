@@ -77,6 +77,7 @@ import { PokedexView } from "@/components/PokedexView";
 import { AuctionView } from "@/components/AuctionView";
 import { SiteMap } from "@/components/SiteMap";
 import { DailyLeaderboard } from "@/components/DailyLeaderboard";
+import { submitDailyScore, loadHandle } from "@/lib/daily-leaderboard";
 import { AchievementToast } from "@/components/AchievementToast";
 import { PracticeMenu } from "@/components/PracticeMenu";
 import { SupportCta } from "@/components/SupportCta";
@@ -545,11 +546,24 @@ function App() {
     if (state.isDaily) {
       const date = todayKey();
       const cur = dailyBest[date];
-      if (!cur || state.score > cur.best) {
+      const isPersonalBest = !cur || state.score > cur.best;
+      if (isPersonalBest) {
         const entry: DailyEntry = { date, best: state.score, bestWave: state.wave };
         const next = { ...dailyBest, [date]: entry };
         saveDailyBest(next);
         setDailyBestState(next);
+      }
+      // Submit to shared leaderboard whenever a handle is set, regardless
+      // of personal-best — Supabase de-dupes by score on read; the rate-
+      // limit trigger guards against runaway inserts.
+      const handle = loadHandle();
+      if (handle && state.score > 0) {
+        void submitDailyScore({
+          day: date,
+          handle,
+          score: state.score,
+          wave: state.wave,
+        });
       }
       // Check daily-podium achievement (computed against opponent set)
       // Use the same generator as DailyLeaderboard for consistency
