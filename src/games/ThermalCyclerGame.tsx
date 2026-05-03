@@ -77,11 +77,10 @@ export function ThermalCyclerGame({ duration, seed, onSuccess, onFail }: MicroGa
 
   useEffect(() => {
     if (scheduledRef.current || completedRef.current) return;
-    const wonNow = hits >= requiredHits;
     const allDone = notes.every((n) => n.hit !== "pending");
-    if (!wonNow && !allDone) return;
+    if (!allDone) return;
     scheduledRef.current = true;
-    const win = wonNow;
+    const win = hits >= requiredHits;
     setTimeout(() => {
       if (completedRef.current) return;
       completedRef.current = true;

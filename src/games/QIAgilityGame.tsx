@@ -16,7 +16,7 @@ function mulberry32(a: number) {
 }
 
 export function QIAgilityGame({ duration, seed, onSuccess, onFail }: MicroGameProps) {
-  const targetCount = 4;
+  const targetCount = 3;
   const completedRef = useRef(false);
   const rngRef = useRef(mulberry32(seed));
   const [tipX, setTipX] = useState(50);
@@ -24,15 +24,17 @@ export function QIAgilityGame({ duration, seed, onSuccess, onFail }: MicroGamePr
   const [hits, setHits] = useState(0);
   const [feedback, setFeedback] = useState<"hit" | "miss" | null>(null);
   const cooldownUntilRef = useRef(0);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const plateRef = useRef<HTMLDivElement>(null);
 
   // Tip oscillation
   useEffect(() => {
     let raf = 0;
     let start = performance.now();
-    const period = 1600;
+    const period = 2400;
     function tick(t: number) {
       const phase = ((t - start) % period) / period;
-      const x = 50 + 45 * Math.sin(phase * Math.PI * 2);
+      const x = 50 + 47 * Math.sin(phase * Math.PI * 2);
       setTipX(x);
       raf = requestAnimationFrame(tick);
     }
@@ -53,12 +55,19 @@ export function QIAgilityGame({ duration, seed, onSuccess, onFail }: MicroGamePr
   function handleDispense() {
     if (completedRef.current) return;
     if (performance.now() < cooldownUntilRef.current) return;
-    const targetCol = target % COLS;
-    const targetXPercent = ((targetCol + 0.5) / COLS) * 100;
-    const dist = Math.abs(tipX - targetXPercent);
-    const tolerance = 100 / COLS / 2;
+    const tipEl = tipRef.current;
+    const plateEl = plateRef.current;
+    if (!tipEl || !plateEl) return;
+    const targetEl = plateEl.querySelector<HTMLElement>(`[data-well="${target}"]`);
+    if (!targetEl) return;
+    const tipRect = tipEl.getBoundingClientRect();
+    const wellRect = targetEl.getBoundingClientRect();
+    const tipCenter = tipRect.left + tipRect.width / 2;
+    const wellCenter = wellRect.left + wellRect.width / 2;
+    const dist = Math.abs(tipCenter - wellCenter);
+    const tolerance = wellRect.width * 0.85;
     if (dist <= tolerance) {
-      cooldownUntilRef.current = performance.now() + 250;
+      cooldownUntilRef.current = performance.now() + 150;
       const newHits = hits + 1;
       setHits(newHits);
       setFeedback("hit");
@@ -104,57 +113,66 @@ export function QIAgilityGame({ duration, seed, onSuccess, onFail }: MicroGamePr
         </p>
       </div>
 
-      <div className="relative w-full max-w-md mt-6 select-none">
-        {/* Vertical alignment beam from tip down through plate */}
-        <div
-          className="absolute z-0 pointer-events-none"
-          style={{
-            left: `${tipX}%`,
-            top: "-50px",
-            bottom: "0",
-            width: "2px",
-            transform: "translateX(-50%)",
-            background: "linear-gradient(to bottom, rgba(52,211,153,0.5), rgba(52,211,153,0.05))",
-          }}
-        />
-
-        {/* Pipette tip */}
-        <div
-          className="absolute -top-12 transition-none z-10"
-          style={{ left: `${tipX}%`, transform: "translateX(-50%)" }}
-        >
-          <div className="h-12 w-2 bg-gradient-to-b from-emerald-300 to-emerald-500 mx-auto rounded-t shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
-          <div
-            className="h-3 w-3 mx-auto bg-emerald-300 rounded-b shadow-[0_0_10px_rgba(52,211,153,0.9)]"
-            style={{ clipPath: "polygon(0 0, 100% 0, 50% 100%)" }}
-          />
-        </div>
-
-        {/* Drop trail */}
-        {feedback === "hit" && (
-          <div
-            className="absolute z-10 pointer-events-none"
-            style={{ left: `${tipX}%`, top: "-4px", transform: "translateX(-50%)" }}
-          >
-            <div className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(52,211,153,1)] animate-ping" />
-          </div>
-        )}
-
+      <div className="relative w-full max-w-md mt-6 select-none pt-14">
         {/* 96-well plate */}
-        <div className="bg-white/[0.02] border border-white/10 rounded-md p-3 mt-4">
+        <div className="bg-white/[0.02] border border-white/10 rounded-md p-3">
           <div
-            className="grid gap-1.5"
+            ref={plateRef}
+            className="relative grid gap-1.5"
             style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}
           >
+            {/* Vertical alignment beam from tip down through plate */}
+            <div
+              className="absolute z-0 pointer-events-none"
+              style={{
+                left: `${tipX}%`,
+                top: "-50px",
+                bottom: "0",
+                width: "2px",
+                transform: "translateX(-50%)",
+                background: "linear-gradient(to bottom, rgba(52,211,153,0.5), rgba(52,211,153,0.05))",
+              }}
+            />
+
+            {/* Pipette tip */}
+            <div
+              className="absolute z-10 flex flex-col items-center"
+              style={{ left: `${tipX}%`, top: "-50px", transform: "translateX(-50%)", width: "12px" }}
+            >
+              <div className="h-12 w-2 bg-gradient-to-b from-emerald-300 to-emerald-500 rounded-t shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
+              <div
+                className="h-3 w-3 bg-emerald-300 rounded-b shadow-[0_0_10px_rgba(52,211,153,0.9)]"
+                style={{ clipPath: "polygon(0 0, 100% 0, 50% 100%)" }}
+              />
+              {/* Invisible 1px drop-point used for hit detection */}
+              <div ref={tipRef} style={{ width: "1px", height: "1px" }} />
+            </div>
+
+            {/* Drop trail */}
+            {feedback === "hit" && (
+              <div
+                className="absolute z-10 pointer-events-none"
+                style={{ left: `${tipX}%`, top: "-4px", transform: "translateX(-50%)" }}
+              >
+                <div className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(52,211,153,1)] animate-ping" />
+              </div>
+            )}
+
             {Array.from({ length: TOTAL }).map((_, i) => {
               const isTarget = i === target;
               const inTargetCol = i % COLS === target % COLS;
+              const targetCol = target % COLS;
+              const targetCenterPct = ((targetCol + 0.5) / COLS) * 100;
+              const tipOverTarget = isTarget && Math.abs(tipX - targetCenterPct) < (100 / COLS) * 0.6;
               return (
                 <div
                   key={i}
+                  data-well={i}
                   className={`aspect-square rounded-full border ${
                     isTarget
-                      ? "bg-emerald-400/40 border-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.7)] animate-pulse"
+                      ? tipOverTarget
+                        ? "bg-emerald-300/70 border-emerald-200 shadow-[0_0_22px_rgba(52,211,153,1)]"
+                        : "bg-emerald-400/40 border-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.7)] animate-pulse"
                       : inTargetCol
                       ? "bg-emerald-400/[0.07] border-emerald-400/25"
                       : "bg-white/[0.02] border-white/10"

@@ -11,10 +11,11 @@ export function SpeedVacGame({ duration, onSuccess, onFail }: MicroGameProps) {
   const [stops, setStops] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<"hit" | "miss" | null>(null);
   const tolerance = 0.06;
-  // Adaptive drop rate so the run finishes at ~80% of wave duration
+  // Drop rate sized so the full run fits inside the wave duration with a reaction buffer
   const totalDrop = 1 - TARGETS[TARGETS.length - 1];
   const pauseTime = 350 * (TARGETS.length - 1);
-  const dropRate = totalDrop / Math.max(2200, duration * 0.8 - pauseTime);
+  const reactionBuffer = 800;
+  const dropRate = totalDrop / Math.max(1200, duration - pauseTime - reactionBuffer);
 
   // Volume drops while running
   useEffect(() => {
@@ -109,7 +110,7 @@ export function SpeedVacGame({ duration, onSuccess, onFail }: MicroGameProps) {
       <div className="relative h-72 w-20 border-2 border-teal-400/40 rounded-b-lg bg-white/[0.02] overflow-hidden">
         {/* Volume fill */}
         <div
-          className="absolute left-0 right-0 bottom-0 transition-all"
+          className="absolute left-0 right-0 bottom-0"
           style={{
             height: `${volume * 100}%`,
             background: "linear-gradient(to top, #2dd4bf, rgba(45,212,191,0.5))",

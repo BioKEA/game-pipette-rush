@@ -15,8 +15,9 @@ export function LightCyclerGame({ duration, seed, onSuccess, onFail }: MicroGame
   const completedRef = useRef(false);
   const startRef = useRef(performance.now());
   const rngRef = useRef(mulberry32(seed));
-  const requiredHits = 2;
-  const sweepDuration = Math.min(1800, duration * 0.5);
+  const requiredHits = 1;
+  const hitBand = 0.16;
+  const sweepDuration = Math.min(1400, duration * 0.45);
 
   const [now, setNow] = useState(0);
   const [hits, setHits] = useState(0);
@@ -51,7 +52,7 @@ export function LightCyclerGame({ duration, seed, onSuccess, onFail }: MicroGame
 
   // Sigmoid value at time t (0 to 1)
   function curveAt(t: number): number {
-    const x = (t / sweepDuration) * 12 - 6;
+    const x = (t / sweepDuration) * 10 - 5;
     return 1 / (1 + Math.exp(-x));
   }
 
@@ -60,8 +61,8 @@ export function LightCyclerGame({ duration, seed, onSuccess, onFail }: MicroGame
 
   // Reset sweep when curve completes
   useEffect(() => {
-    if (elapsed > sweepDuration + 400) {
-      setSweepStart(now + 200);
+    if (elapsed > sweepDuration + 200) {
+      setSweepStart(now + 100);
       setThresholdY(0.45 + rngRef.current() * 0.3);
     }
   }, [elapsed, sweepDuration, now]);
@@ -69,7 +70,7 @@ export function LightCyclerGame({ duration, seed, onSuccess, onFail }: MicroGame
   function handleTap() {
     if (completedRef.current) return;
     const dist = Math.abs(curveValue - thresholdY);
-    if (dist < 0.12 && elapsed > 200) {
+    if (dist < hitBand && elapsed > 200) {
       const newHits = hits + 1;
       setHits(newHits);
       setFeedback("hit");
@@ -146,9 +147,9 @@ export function LightCyclerGame({ duration, seed, onSuccess, onFail }: MicroGame
           {/* Hit-zone band */}
           <rect
             x="0"
-            y={(1 - thresholdY - 0.12) * 100}
+            y={(1 - thresholdY - hitBand) * 100}
             width="100"
-            height={0.24 * 100}
+            height={hitBand * 2 * 100}
             fill="rgba(253,224,71,0.08)"
           />
           {/* Threshold line */}

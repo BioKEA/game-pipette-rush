@@ -143,10 +143,19 @@ const SPECIMENS: Specimen[] = [
 
 export function DiversityScannerGame({ duration, seed, onSuccess, onFail }: MicroGameProps) {
   const completedRef = useRef(false);
-  const rng = useRef(mulberry32(seed));
-  const specimen = SPECIMENS[Math.floor(rng.current() * SPECIMENS.length)];
-  const correctIdx = Math.floor(rng.current() * specimen.features.length);
-  const correctFeature = specimen.features[correctIdx];
+  const round = useRef<{
+    specimen: Specimen;
+    correctFeature: { id: string; label: string };
+    confidence: string;
+  } | null>(null);
+  if (round.current === null) {
+    const rng = mulberry32(seed);
+    const specimen = SPECIMENS[Math.floor(rng() * SPECIMENS.length)];
+    const correctFeature = specimen.features[Math.floor(rng() * specimen.features.length)];
+    const confidence = (0.7 + rng() * 0.25).toFixed(2);
+    round.current = { specimen, correctFeature, confidence };
+  }
+  const { specimen, correctFeature, confidence } = round.current;
   const [picked, setPicked] = useState<string | null>(null);
   const [hovering, setHovering] = useState<string | null>(null);
 
@@ -192,7 +201,7 @@ export function DiversityScannerGame({ duration, seed, onSuccess, onFail }: Micr
             specimen · {specimen.name.toLowerCase()}
           </p>
           <p className="absolute bottom-2 right-2 text-[9px] font-mono text-white/40">
-            attention overlay · conf {(0.7 + rng.current() * 0.25).toFixed(2)}
+            attention overlay · conf {confidence}
           </p>
           {!picked && !hovering && (
             <p className="absolute top-2 right-2 text-[9px] font-mono text-white/40">

@@ -24,9 +24,17 @@ export function GelGame({ duration, seed, onSuccess, onFail }: MicroGameProps) {
   const layout = useRef<{ samples: number[]; wells: number[] } | null>(null);
   if (!layout.current) {
     const rng = mulberry32(seed);
-    // Pick 5 colors and randomize sample order
     const wells = [0, 1, 2, 3, 4]; // wells in fixed color order
-    const samples = [...wells].sort(() => rng() - 0.5);
+    // Fisher-Yates shuffle for the sample order
+    const samples = [...wells];
+    for (let i = samples.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [samples[i], samples[j]] = [samples[j], samples[i]];
+    }
+    // Guarantee a non-identity permutation so the puzzle is never trivial
+    if (samples.every((v, idx) => v === idx)) {
+      [samples[0], samples[1]] = [samples[1], samples[0]];
+    }
     layout.current = { samples, wells };
   }
   const data = layout.current;
@@ -59,10 +67,9 @@ export function GelGame({ duration, seed, onSuccess, onFail }: MicroGameProps) {
     const wellOccupied = Object.values(placed).includes(wellIdx);
     if (wellOccupied) return;
     if (sampleColor !== wellColor) {
-      // Wrong color — flash feedback, drop the selection, but keep playing
+      // Wrong color — flash feedback, but keep the sample selected so the player can retry
       play("miss");
       setWrongWell(wellIdx);
-      setDragging(null);
       setTimeout(() => setWrongWell(null), 350);
       return;
     }

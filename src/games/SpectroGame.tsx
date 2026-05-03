@@ -9,6 +9,8 @@ export function SpectroGame({ duration, onSuccess, onFail }: MicroGameProps) {
   const [peakX, setPeakX] = useState(0.5);
   const [onTargetMs, setOnTargetMs] = useState(0);
   const startRef = useRef(performance.now());
+  const cursorXRef = useRef(0.5);
+  const peakXRef = useRef(0.5);
 
   // Move peak sinusoidally
   useEffect(() => {
@@ -17,18 +19,20 @@ export function SpectroGame({ duration, onSuccess, onFail }: MicroGameProps) {
       const elapsed = t - startRef.current;
       const slow = Math.sin(elapsed / 1300) * 0.3;
       const fast = Math.sin(elapsed / 400) * 0.05;
-      setPeakX(0.5 + slow + fast);
+      const p = 0.5 + slow + fast;
+      peakXRef.current = p;
+      setPeakX(p);
       raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Cumulative time-on-target accumulator
+  // Cumulative time-on-target accumulator (runs once on mount)
   useEffect(() => {
     const id = setInterval(() => {
       setOnTargetMs((prev) => {
-        const dist = Math.abs(cursorX - peakX);
+        const dist = Math.abs(cursorXRef.current - peakXRef.current);
         const next = dist <= tolerance ? Math.min(requiredOnTarget, prev + 30) : Math.max(0, prev - 50);
         if (next >= requiredOnTarget && !completedRef.current) {
           completedRef.current = true;
@@ -38,7 +42,7 @@ export function SpectroGame({ duration, onSuccess, onFail }: MicroGameProps) {
       });
     }, 30);
     return () => clearInterval(id);
-  }, [cursorX, peakX, onSuccess]);
+  }, [onSuccess]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -52,8 +56,9 @@ export function SpectroGame({ duration, onSuccess, onFail }: MicroGameProps) {
 
   function handleMove(e: React.PointerEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    setCursorX(Math.max(0, Math.min(1, x)));
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    cursorXRef.current = x;
+    setCursorX(x);
   }
 
   const onTargetPct = (onTargetMs / requiredOnTarget) * 100;

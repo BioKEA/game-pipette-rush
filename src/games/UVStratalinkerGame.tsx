@@ -11,15 +11,20 @@ export function UVStratalinkerGame({ duration, seed, onSuccess, onFail }: MicroG
   const [feedback, setFeedback] = useState<"hit" | "miss" | null>(null);
   const startRef = useRef(performance.now());
   const seedRef = useRef(seed);
+  const positionRef = useRef(0);
+  const zoneStartRef = useRef(0.4);
+  const hitsRef = useRef(0);
 
   // Sweep loop
   useEffect(() => {
     let raf = 0;
-    const period = 1700; // ms per sweep
+    const period = 2200; // ms per full sweep
     function tick(t: number) {
       const phase = ((t - startRef.current) % period) / period;
       // Triangle wave: 0 → 1 → 0
-      setPosition(phase < 0.5 ? phase * 2 : 2 - phase * 2);
+      const p = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+      positionRef.current = p;
+      setPosition(p);
       raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
@@ -27,22 +32,36 @@ export function UVStratalinkerGame({ duration, seed, onSuccess, onFail }: MicroG
   }, []);
 
   useEffect(() => {
+    hitsRef.current = hits;
+  }, [hits]);
+
+  useEffect(() => {
+    zoneStartRef.current = zoneStart;
+  }, [zoneStart]);
+
+  useEffect(() => {
     const t = setTimeout(() => {
       if (!completedRef.current) {
         completedRef.current = true;
-        if (hits >= requiredHits) onSuccess();
+        if (hitsRef.current >= requiredHits) onSuccess();
         else onFail();
       }
     }, duration);
     return () => clearTimeout(t);
-  }, [duration, onSuccess, onFail, hits]);
+  }, [duration, onSuccess, onFail]);
 
-  const zoneSize = 0.12;
-  const inZone = position >= zoneStart && position <= zoneStart + zoneSize;
+  const zoneSize = 0.16;
+  const hitTolerance = 0.025; // small forgiveness margin on each side
+  const inZone =
+    position >= zoneStart - hitTolerance &&
+    position <= zoneStart + zoneSize + hitTolerance;
 
   function fire() {
     if (completedRef.current) return;
-    if (inZone) {
+    const p = positionRef.current;
+    const zs = zoneStartRef.current;
+    const isHit = p >= zs - hitTolerance && p <= zs + zoneSize + hitTolerance;
+    if (isHit) {
       const newHits = hits + 1;
       setHits(newHits);
       setFeedback("hit");

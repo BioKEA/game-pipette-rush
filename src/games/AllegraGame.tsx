@@ -124,6 +124,7 @@ export function AllegraGame({ duration, onSuccess, onFail }: MicroGameProps) {
                       fill="#a3e635"
                       stroke="#365314"
                       strokeWidth="0.5"
+                      pointerEvents="none"
                     />
                     <text
                       x={x}
@@ -132,13 +133,14 @@ export function AllegraGame({ duration, onSuccess, onFail }: MicroGameProps) {
                       textAnchor="middle"
                       fill="#0a0e1a"
                       fontWeight="bold"
+                      pointerEvents="none"
                     >
                       {tubeMass}
                     </text>
                   </>
                 )}
                 {dragging !== null && occupied === undefined && (
-                  <circle cx={x} cy={y} r="22" fill="rgba(163,230,53,0.1)" stroke="#a3e635" strokeWidth="2" strokeDasharray="3 3" />
+                  <circle cx={x} cy={y} r="22" fill="rgba(163,230,53,0.1)" stroke="#a3e635" strokeWidth="2" strokeDasharray="3 3" pointerEvents="none" />
                 )}
               </g>
             );

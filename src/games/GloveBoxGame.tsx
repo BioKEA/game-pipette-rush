@@ -11,45 +11,59 @@ export function GloveBoxGame({ duration, seed, onSuccess, onFail }: MicroGamePro
   const [target, setTarget] = useState({ x: 0.3, y: 0.4 });
   const [feedback, setFeedback] = useState<"hit" | "miss" | null>(null);
   const seedRef = useRef(seed);
+  const pointerRef = useRef({ x: 0.5, y: 0.5 });
+  const smoothedRef = useRef({ x: 0.5, y: 0.5 });
+  const hitsRef = useRef(0);
 
-  // Smoothed cursor follows pointer with lag
+  // Smoothed cursor follows pointer with lag — runs once on mount
   useEffect(() => {
     let raf = 0;
     function tick() {
-      setSmoothed((s) => ({
-        x: s.x + (pointer.x - s.x) * 0.09,
-        y: s.y + (pointer.y - s.y) * 0.09,
-      }));
+      const p = pointerRef.current;
+      const s = smoothedRef.current;
+      const next = {
+        x: s.x + (p.x - s.x) * 0.09,
+        y: s.y + (p.y - s.y) * 0.09,
+      };
+      smoothedRef.current = next;
+      setSmoothed(next);
       raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [pointer]);
+  }, []);
+
+  useEffect(() => {
+    hitsRef.current = hits;
+  }, [hits]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       if (!completedRef.current) {
         completedRef.current = true;
-        if (hits >= requiredHits) onSuccess();
+        if (hitsRef.current >= requiredHits) onSuccess();
         else onFail();
       }
     }, duration);
     return () => clearTimeout(t);
-  }, [duration, onSuccess, onFail, hits]);
+  }, [duration, onSuccess, onFail]);
 
   function handleMove(e: React.PointerEvent<HTMLDivElement>) {
     if (completedRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    setPointer({
+    const p = {
       x: (e.clientX - rect.left) / rect.width,
       y: (e.clientY - rect.top) / rect.height,
-    });
+    };
+    pointerRef.current = p;
+    setPointer(p);
   }
 
   function handleClick() {
     if (completedRef.current) return;
-    const dx = smoothed.x - target.x;
-    const dy = smoothed.y - target.y;
+    const s = smoothedRef.current;
+    const dx = s.x - target.x;
+    const dy = s.y - target.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 0.085) {
       const next = hits + 1;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { STAGES, type StageDef } from "@/types/game";
+import { STAGES, type StageDef, type StageId } from "@/types/game";
 import { paletteFor } from "@/lib/palette";
 import { useStableCallback } from "@/lib/useStable";
 import {
@@ -174,12 +174,18 @@ function isBossWaveNumber(wave: number, interval: number): boolean {
   return wave > 0 && wave % interval === 0;
 }
 
+const STAGE_TIME_BONUS_MS: Partial<Record<StageId, number>> = {
+  allegra: 1000,
+  gel: 2000,
+};
+
 function durationForWave(
   wave: number,
   slowWaves: number,
   siteDifficulty: number,
   isBoss: boolean,
-  difficulty: DifficultyId
+  difficulty: DifficultyId,
+  stageId: StageId
 ): number {
   const def = difficultyDef(difficulty);
   const base = Math.max(2000, 5500 - wave * def.speedupPerWave);
@@ -187,7 +193,7 @@ function durationForWave(
   const withUpgrade = withTier * (1 + slowWaves * 0.15);
   const withSite = withUpgrade * siteDifficulty;
   const bossMult = isBoss ? 0.85 : 1;
-  return Math.round(withSite * bossMult);
+  return Math.round(withSite * bossMult) + (STAGE_TIME_BONUS_MS[stageId] ?? 0);
 }
 
 function App() {
@@ -1202,7 +1208,8 @@ function GameView({
     state.upgrades.slowWaves,
     site.difficulty,
     state.isBossWave,
-    state.difficulty
+    state.difficulty,
+    stage.id
   );
   const showTutorial =
     state.showTutorial &&
@@ -1479,7 +1486,7 @@ function ResultOverlay({
               <>
                 <p className="text-6xl">✓</p>
                 <p className="text-emerald-400 mt-2 text-sm uppercase tracking-[0.3em]">
-                  clean read
+                  great technique!
                 </p>
               </>
             )}
@@ -1657,7 +1664,7 @@ function PracticeView({
   const stage = state.currentStage!;
   const palette = paletteFor(stage);
   // Generous duration for practice — wave 1 difficulty
-  const duration = 5500;
+  const duration = 5500 + (STAGE_TIME_BONUS_MS[stage.id] ?? 0);
 
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white flex flex-col">

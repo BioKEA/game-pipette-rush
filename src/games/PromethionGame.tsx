@@ -87,11 +87,10 @@ export function PromethionGame({ duration, seed, onSuccess, onFail }: MicroGameP
 
   useEffect(() => {
     if (scheduledRef.current || completedRef.current) return;
-    const wonNow = hits >= requiredHits;
     const allDone = glyphs.every((g) => glyphState[g.id] !== "pending");
-    if (!wonNow && !allDone) return;
+    if (!allDone) return;
     scheduledRef.current = true;
-    const win = wonNow;
+    const win = hits >= requiredHits;
     setTimeout(() => {
       if (completedRef.current) return;
       completedRef.current = true;
@@ -186,8 +185,8 @@ export function PromethionGame({ duration, seed, onSuccess, onFail }: MicroGameP
             const state = glyphState[g.id];
             const top = `calc(${progress * 100}% - 24px)`;
             const opacity = state === "miss" ? 0.15 : state === "good" ? 0 : 1;
-            // Each glyph in its own column
-            const colIdx = g.id % 4;
+            // Glyph falls in the lane matching its base
+            const colIdx = BASES.indexOf(g.base);
             const left = `${(colIdx + 0.5) * 25}%`;
             return (
               <div
