@@ -1,6 +1,11 @@
 import { GAME_ID, leaderboard } from "./leaderboard-client";
 
 const HANDLE_KEY = "pipette-rush:handle-v1";
+// Cross-game key written by the BioKEA leaderboard prompt. Mirror
+// reads/writes so a player who set their handle via another BioKEA
+// game (or a different browser tab) doesn't silently drop their first
+// pipette daily score.
+const CROSS_GAME_HANDLE_KEY = "biokea:player:handle";
 
 export interface LeaderboardRow {
   id: string;
@@ -13,7 +18,10 @@ export interface LeaderboardRow {
 
 export function loadHandle(): string | null {
   try {
-    return localStorage.getItem(HANDLE_KEY);
+    return (
+      localStorage.getItem(HANDLE_KEY) ??
+      localStorage.getItem(CROSS_GAME_HANDLE_KEY)
+    );
   } catch {
     return null;
   }
@@ -24,6 +32,7 @@ export function saveHandle(input: string): string {
   if (!clean) return "";
   try {
     localStorage.setItem(HANDLE_KEY, clean);
+    localStorage.setItem(CROSS_GAME_HANDLE_KEY, clean);
   } catch {
     // ignore
   }

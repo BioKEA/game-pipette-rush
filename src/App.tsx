@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Toaster, toast } from "sonner";
 import { STAGES, type StageDef, type StageId } from "@/types/game";
 import { paletteFor } from "@/lib/palette";
 import { useStableCallback } from "@/lib/useStable";
@@ -78,6 +79,29 @@ import { AuctionView } from "@/components/AuctionView";
 import { SiteMap } from "@/components/SiteMap";
 import { DailyLeaderboard } from "@/components/DailyLeaderboard";
 import { submitDailyScore, loadHandle, saveHandle } from "@/lib/daily-leaderboard";
+
+// Wraps submitDailyScore with a toast so the player sees whether the
+// score actually landed. Without this, network or RLS failures look
+// identical to silence.
+async function submitWithToast(args: Parameters<typeof submitDailyScore>[0]) {
+  const id = toast.loading("Posting score to BioKEA leaderboard…");
+  try {
+    const res = await submitDailyScore(args);
+    if (res.ok) {
+      toast.success("Posted to leaderboard", {
+        id,
+        description: "View it at biokea.ai/mission/games/leaderboard",
+      });
+    } else {
+      toast.error(`Couldn't post score: ${res.error}`, { id });
+    }
+  } catch (err) {
+    toast.error(
+      `Couldn't post score: ${err instanceof Error ? err.message : "unknown error"}`,
+      { id },
+    );
+  }
+}
 import { BiokeaLeaderboardPrompt, shouldShowBiokeaPrompt } from "@/components/BiokeaLeaderboardPrompt";
 import { AchievementToast } from "@/components/AchievementToast";
 import { PracticeMenu } from "@/components/PracticeMenu";
@@ -576,11 +600,16 @@ function App() {
       // or skipped it this session. Pre-fills handle if one exists.
       // If they skip with a handle stored, the score still posts.
       const handle = loadHandle();
-      if (state.score > 0 && shouldShowBiokeaPrompt()) {
+      if (state.score > 0 && (shouldShowBiokeaPrompt() || !handle)) {
+        // Open the prompt either when actively wanted (first run, no
+        // subscribe yet) or as a forced handle-capture fallback when
+        // the prompt is otherwise suppressed but no handle exists —
+        // without this, the score would silently drop, which is
+        // exactly the bug the user reported.
         setBiokeaPromptScore({ score: state.score, wave: state.wave, date });
         setBiokeaPromptOpen(true);
       } else if (handle && state.score > 0) {
-        void submitDailyScore({
+        void submitWithToast({
           day: date,
           handle,
           score: state.score,
@@ -795,6 +824,17 @@ function App() {
   if (state.phase === "gameover") {
     return (
       <>
+        <Toaster
+          theme="dark"
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: "rgba(10, 14, 26, 0.95)",
+              border: "1px solid rgba(34, 211, 238, 0.35)",
+              color: "#eef2f6",
+            },
+          }}
+        />
         <GameOverScreen
           score={state.score}
           wave={state.wave}
@@ -830,7 +870,7 @@ function App() {
               saveHandle(result.handle);
               setBiokeaPromptOpen(false);
               if (biokeaPromptScore.score > 0 && biokeaPromptScore.date) {
-                void submitDailyScore({
+                void submitWithToast({
                   day: biokeaPromptScore.date,
                   handle: result.handle,
                   score: biokeaPromptScore.score,
@@ -844,7 +884,7 @@ function App() {
               // "skip the email step", not "skip the leaderboard".
               const existing = loadHandle();
               if (existing && biokeaPromptScore.score > 0 && biokeaPromptScore.date) {
-                void submitDailyScore({
+                void submitWithToast({
                   day: biokeaPromptScore.date,
                   handle: existing,
                   score: biokeaPromptScore.score,
