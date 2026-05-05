@@ -61,10 +61,14 @@ export function markTutorialSeen() {
 }
 
 export function loadMuted(): boolean {
+  // Default to muted on first visit. Once the player toggles a
+  // preference, "0"/"1" is stored and respected.
   try {
-    return localStorage.getItem(MUTED_KEY) === "1";
+    const v = localStorage.getItem(MUTED_KEY);
+    if (v === "0") return false;
+    return true;
   } catch {
-    return false;
+    return true;
   }
 }
 
