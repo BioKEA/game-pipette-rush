@@ -1200,12 +1200,20 @@ function GameOverScreen({
           </div>
         </div>
 
-        <button
-          onClick={onRestart}
-          className="mt-8 bg-cyan-400 text-[#0a0e1a] font-bold px-10 py-3 rounded hover:bg-cyan-300 transition-colors uppercase tracking-widest text-sm shadow-[0_0_30px_rgba(34,211,238,0.4)]"
-        >
-          {isDaily ? "Try Again" : "New Run"}
-        </button>
+        <div className="mt-8 flex justify-center gap-3 flex-wrap">
+          <button
+            onClick={onRestart}
+            className="bg-cyan-400 text-[#0a0e1a] font-bold px-8 py-3 rounded hover:bg-cyan-300 transition-colors uppercase tracking-widest text-sm shadow-[0_0_30px_rgba(34,211,238,0.4)]"
+          >
+            {isDaily ? "Try Again" : "New Run"}
+          </button>
+          <button
+            onClick={onHome}
+            className="bg-transparent border border-white/30 text-white/85 font-semibold px-6 py-3 rounded hover:bg-white/10 hover:border-white/60 transition-colors uppercase tracking-widest text-sm"
+          >
+            ← Main Menu
+          </button>
+        </div>
 
         <div className="mt-4 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-white/60">
           {isDaily && onOpenDaily && (
@@ -1215,9 +1223,6 @@ function GameOverScreen({
           )}
           <button onClick={onOpenPokedex} className="hover:text-cyan-400">
             Pokedex · {pokedexCount}
-          </button>
-          <button onClick={onHome} className="hover:text-white">
-            ← Home
           </button>
         </div>
       </div>
