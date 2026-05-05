@@ -77,7 +77,8 @@ import { PokedexView } from "@/components/PokedexView";
 import { AuctionView } from "@/components/AuctionView";
 import { SiteMap } from "@/components/SiteMap";
 import { DailyLeaderboard } from "@/components/DailyLeaderboard";
-import { submitDailyScore, loadHandle } from "@/lib/daily-leaderboard";
+import { submitDailyScore, loadHandle, saveHandle } from "@/lib/daily-leaderboard";
+import { BiokeaLeaderboardPrompt } from "@/components/BiokeaLeaderboardPrompt";
 import { AchievementToast } from "@/components/AchievementToast";
 import { PracticeMenu } from "@/components/PracticeMenu";
 import { SupportCta } from "@/components/SupportCta";
@@ -225,6 +226,11 @@ function App() {
   const [muted, setMutedState] = useState(() => loadMuted());
   const sessionRunsRef = useRef(0);
   const [showCta, setShowCta] = useState(false);
+  // BiokeaLeaderboardPrompt — shown on game-end when no handle exists.
+  const [biokeaPromptOpen, setBiokeaPromptOpen] = useState(false);
+  const [biokeaPromptScore, setBiokeaPromptScore] = useState<{ score: number; wave: number; date: string }>(
+    { score: 0, wave: 0, date: "" },
+  );
 
   useEffect(() => {
     setMuted(muted);
@@ -575,9 +581,11 @@ function App() {
           wave: state.wave,
         });
       } else if (!handle && state.score > 0) {
-        setTimeout(() => {
-          setState((s) => (s.phase === "gameover" ? { ...s, phase: "daily-board" } : s));
-        }, 1500);
+        // No handle yet — open the BioKEA leaderboard prompt over the
+        // game-over screen so the player can post the run + optionally
+        // subscribe to lab updates in one step.
+        setBiokeaPromptScore({ score: state.score, wave: state.wave, date });
+        setBiokeaPromptOpen(true);
       }
       // Check daily-podium achievement (computed against opponent set)
       // Use the same generator as DailyLeaderboard for consistency
@@ -807,6 +815,32 @@ function App() {
           />
         )}
         {showCta && <SupportCta onDismiss={dismissCta} />}
+        {biokeaPromptOpen && (
+          <BiokeaLeaderboardPrompt
+            trigger="game-end"
+            gameSlug="pipette-rush"
+            gameTitle="Pipette Rush"
+            score={{
+              value: biokeaPromptScore.score.toLocaleString(),
+              label: "Score",
+              unit: `pts · wave ${biokeaPromptScore.wave}`,
+            }}
+            defaultHandle={loadHandle() ?? ""}
+            onSubmit={(result) => {
+              saveHandle(result.handle);
+              setBiokeaPromptOpen(false);
+              if (biokeaPromptScore.score > 0 && biokeaPromptScore.date) {
+                void submitDailyScore({
+                  day: biokeaPromptScore.date,
+                  handle: result.handle,
+                  score: biokeaPromptScore.score,
+                  wave: biokeaPromptScore.wave,
+                });
+              }
+            }}
+            onSkip={() => setBiokeaPromptOpen(false)}
+          />
+        )}
       </>
     );
   }
