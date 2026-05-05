@@ -79,16 +79,67 @@ export async function submitDailyScore(args: {
   return { ok: true };
 }
 
-export async function fetchTopDaily(day: string, limit = 10): Promise<LeaderboardRow[]> {
-  const entries = await leaderboard.getDailyLeaderboard(GAME_ID, day, limit);
-  const me = loadHandle();
-  return entries.map((e) => ({
+export type LeaderboardWindow = "today" | "week" | "all";
+
+// Returns the inclusive start of the rolling 7-day window ending today.
+// Lexicographic compare on YYYY-MM-DD seeds is chronological, so this
+// is what we hand to the seedFrom range filter.
+export function weekStart(today: string): string {
+  const d = new Date(today + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 6);
+  return d.toISOString().slice(0, 10);
+}
+
+function toRow(e: { id: string; player_handle: string; score: number; metadata?: Record<string, unknown> | null; created_at: string }, me: string | null): LeaderboardRow {
+  return {
     id: e.id,
     handle: e.player_handle,
     score: e.score,
-    wave:
-      typeof e.metadata?.wave === "number" ? (e.metadata.wave as number) : 0,
+    wave: typeof e.metadata?.wave === "number" ? (e.metadata.wave as number) : 0,
     isYou: !!me && e.player_handle === me,
     created_at: e.created_at,
-  }));
+  };
+}
+
+// Collapses cross-day rows to one per handle (their best). Used for the
+// week + all-time windows so a single player who's posted every day
+// doesn't take up the whole top 10.
+function bestByHandle(rows: LeaderboardRow[]): LeaderboardRow[] {
+  const best = new Map<string, LeaderboardRow>();
+  for (const r of rows) {
+    const existing = best.get(r.handle);
+    if (!existing || r.score > existing.score) best.set(r.handle, r);
+  }
+  return Array.from(best.values()).sort((a, b) => b.score - a.score);
+}
+
+export async function fetchTopDaily(day: string, limit = 10): Promise<LeaderboardRow[]> {
+  const entries = await leaderboard.getDailyLeaderboard(GAME_ID, day, limit);
+  const me = loadHandle();
+  return entries.map((e) => toRow(e, me));
+}
+
+export async function fetchTop(
+  window: LeaderboardWindow,
+  today: string,
+  limit = 10,
+): Promise<LeaderboardRow[]> {
+  const me = loadHandle();
+  if (window === "today") {
+    const entries = await leaderboard.getDailyLeaderboard(GAME_ID, today, limit);
+    return entries.map((e) => toRow(e, me));
+  }
+  // Week + all-time: pull a generous slice (limit * 8) so dedupe leaves
+  // enough rows for a top 10 even when a few handles dominate.
+  const opts: { gameId: string; mode: string; limit: number; seedFrom?: string; seedTo?: string } = {
+    gameId: GAME_ID,
+    mode: "daily",
+    limit: limit * 8,
+  };
+  if (window === "week") {
+    opts.seedFrom = weekStart(today);
+    opts.seedTo = today;
+  }
+  const entries = await leaderboard.getTopScores(opts);
+  return bestByHandle(entries.map((e) => toRow(e, me))).slice(0, limit);
 }

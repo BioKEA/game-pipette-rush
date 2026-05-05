@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { type DailyEntry } from "@/lib/storage";
 import {
-  fetchTopDaily,
+  fetchTop,
   loadHandle,
   saveHandle,
   sanitizeHandle,
   submitDailyScore,
   type LeaderboardRow,
+  type LeaderboardWindow,
 } from "@/lib/daily-leaderboard";
 
 interface Props {
@@ -19,12 +20,15 @@ interface Props {
 export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
   const [handle, setHandleState] = useState<string | null>(() => loadHandle());
   const [draftHandle, setDraftHandle] = useState("");
+  const [view, setView] = useState<LeaderboardWindow>("today");
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchTopDaily(date)
+    setRows(null);
+    setLoadError(null);
+    fetchTop(view, date)
       .then((r) => {
         if (!cancelled) setRows(r);
       })
@@ -34,7 +38,7 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, view]);
 
   function commitHandle() {
     const clean = saveHandle(draftHandle);
@@ -51,8 +55,8 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
         wave: yourEntry.bestWave,
       }).then((res) => {
         if (res.ok) {
-          // Refresh the rankings so the just-posted score shows up.
-          void fetchTopDaily(date).then(setRows).catch(() => undefined);
+          // Refresh whichever window is currently showing.
+          void fetchTop(view, date).then(setRows).catch(() => undefined);
         }
       });
     }
@@ -67,12 +71,42 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
       <div className="max-w-md w-full">
         <div className="text-center mb-5">
           <p className="text-[10px] uppercase tracking-[0.4em] text-amber-300/80">
-            Daily seed
+            {view === "today"
+              ? "Daily seed"
+              : view === "week"
+              ? "Last 7 days"
+              : "All time"}
           </p>
-          <h1 className="text-2xl font-light mt-1">{formatDate(date)}</h1>
+          <h1 className="text-2xl font-light mt-1">
+            {view === "today"
+              ? formatDate(date)
+              : view === "week"
+              ? "Best run · last 7 days"
+              : "Best run · ever"}
+          </h1>
           <p className="text-xs text-white/40 font-mono mt-1">
-            Same wave order, same drops, same site spawns for everyone.
+            {view === "today"
+              ? "Same wave order, same drops, same site spawns for everyone."
+              : view === "week"
+              ? "One row per player — their best daily run in the last week."
+              : "One row per player — their best daily run, all time."}
           </p>
+        </div>
+
+        <div className="flex items-center justify-center gap-1 mb-4">
+          {(["today", "week", "all"] as const).map((w) => (
+            <button
+              key={w}
+              onClick={() => setView(w)}
+              className={`text-[10px] uppercase tracking-[0.18em] font-mono px-3 py-1.5 rounded border transition-colors ${
+                view === w
+                  ? "bg-amber-300/15 text-amber-200 border-amber-300/40"
+                  : "text-white/50 border-white/10 hover:text-white/80 hover:border-white/20"
+              }`}
+            >
+              {w === "today" ? "Today" : w === "week" ? "Week" : "All-time"}
+            </button>
+          ))}
         </div>
 
         {!handle && (
@@ -115,7 +149,9 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
           )}
           {rows && rows.length === 0 && (
             <div className="px-4 py-6 text-center text-xs text-white/50 font-mono">
-              No scores yet today. Be the first.
+              {view === "today"
+                ? "No scores yet today. Be the first."
+                : "No scores yet."}
             </div>
           )}
           {rows &&
@@ -171,7 +207,7 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
         {yourEntry && (
           <p className="text-[11px] text-center text-white/50 mb-3 font-mono">
             your local best · {yourEntry.best.toLocaleString()} (w{yourEntry.bestWave})
-            {yourRank > 0 && ` · rank #${yourRank}`}
+            {view === "today" && yourRank > 0 && ` · rank #${yourRank}`}
           </p>
         )}
 
