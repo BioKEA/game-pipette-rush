@@ -78,7 +78,7 @@ import { AuctionView } from "@/components/AuctionView";
 import { SiteMap } from "@/components/SiteMap";
 import { DailyLeaderboard } from "@/components/DailyLeaderboard";
 import { submitDailyScore, loadHandle, saveHandle } from "@/lib/daily-leaderboard";
-import { BiokeaLeaderboardPrompt } from "@/components/BiokeaLeaderboardPrompt";
+import { BiokeaLeaderboardPrompt, shouldShowBiokeaPrompt } from "@/components/BiokeaLeaderboardPrompt";
 import { AchievementToast } from "@/components/AchievementToast";
 import { PracticeMenu } from "@/components/PracticeMenu";
 import { SupportCta } from "@/components/SupportCta";
@@ -572,20 +572,20 @@ function App() {
       // If the player hasn't set a handle yet, kick them to the daily-board
       // phase so they're prompted; otherwise the score would silently never
       // post (which is exactly what was happening before the audit).
+      // Open the BioKEA prompt unless the player has subscribed already
+      // or skipped it this session. Pre-fills handle if one exists.
+      // If they skip with a handle stored, the score still posts.
       const handle = loadHandle();
-      if (handle && state.score > 0) {
+      if (state.score > 0 && shouldShowBiokeaPrompt()) {
+        setBiokeaPromptScore({ score: state.score, wave: state.wave, date });
+        setBiokeaPromptOpen(true);
+      } else if (handle && state.score > 0) {
         void submitDailyScore({
           day: date,
           handle,
           score: state.score,
           wave: state.wave,
         });
-      } else if (!handle && state.score > 0) {
-        // No handle yet — open the BioKEA leaderboard prompt over the
-        // game-over screen so the player can post the run + optionally
-        // subscribe to lab updates in one step.
-        setBiokeaPromptScore({ score: state.score, wave: state.wave, date });
-        setBiokeaPromptOpen(true);
       }
       // Check daily-podium achievement (computed against opponent set)
       // Use the same generator as DailyLeaderboard for consistency
@@ -838,7 +838,20 @@ function App() {
                 });
               }
             }}
-            onSkip={() => setBiokeaPromptOpen(false)}
+            onSkip={() => {
+              setBiokeaPromptOpen(false);
+              // Still post if a handle is already stored — Skip means
+              // "skip the email step", not "skip the leaderboard".
+              const existing = loadHandle();
+              if (existing && biokeaPromptScore.score > 0 && biokeaPromptScore.date) {
+                void submitDailyScore({
+                  day: biokeaPromptScore.date,
+                  handle: existing,
+                  score: biokeaPromptScore.score,
+                  wave: biokeaPromptScore.wave,
+                });
+              }
+            }}
           />
         )}
       </>
