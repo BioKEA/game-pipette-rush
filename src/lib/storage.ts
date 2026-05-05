@@ -1,9 +1,7 @@
 const HIGH_SCORE_KEY = "ldc-high-score";
-const POKEDEX_KEY = "ldc-pokedex";
 const TUTORIAL_KEY = "ldc-tutorial-seen";
 const MUTED_KEY = "ldc-muted";
 const ACHIEVEMENTS_KEY = "ldc-achievements";
-const SITES_VISITED_KEY = "ldc-sites-visited";
 const STAGE_WINS_KEY = "ldc-stage-wins";
 const DAILY_BEST_KEY = "ldc-daily-best";
 const PRACTICE_STATS_KEY = "ldc-practice-stats";
@@ -22,23 +20,6 @@ export function loadHighScore(): number {
 export function saveHighScore(score: number) {
   try {
     localStorage.setItem(HIGH_SCORE_KEY, String(score));
-  } catch {
-    // ignore
-  }
-}
-
-export function loadPokedex(): Record<string, number> {
-  try {
-    const v = localStorage.getItem(POKEDEX_KEY);
-    return v ? JSON.parse(v) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function savePokedex(dex: Record<string, number>) {
-  try {
-    localStorage.setItem(POKEDEX_KEY, JSON.stringify(dex));
   } catch {
     // ignore
   }
@@ -92,23 +73,6 @@ export function loadAchievements(): Record<string, number> {
 export function saveAchievements(unlocked: Record<string, number>) {
   try {
     localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(unlocked));
-  } catch {
-    // ignore
-  }
-}
-
-export function loadSitesVisited(): Record<string, number> {
-  try {
-    const v = localStorage.getItem(SITES_VISITED_KEY);
-    return v ? JSON.parse(v) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function saveSitesVisited(visits: Record<string, number>) {
-  try {
-    localStorage.setItem(SITES_VISITED_KEY, JSON.stringify(visits));
   } catch {
     // ignore
   }

@@ -6,16 +6,12 @@ import { useStableCallback } from "@/lib/useStable";
 import {
   loadHighScore,
   saveHighScore,
-  loadPokedex,
-  savePokedex,
   hasSeenTutorial,
   markTutorialSeen,
   loadMuted,
   saveMuted,
   loadAchievements,
   saveAchievements,
-  loadSitesVisited,
-  saveSitesVisited,
   loadStageWins,
   saveStageWins,
   loadDailyBest,
@@ -38,13 +34,6 @@ import {
 } from "@/types/difficulty";
 import { play, setMuted, unlockAudio } from "@/lib/audio";
 import {
-  rollSpecies,
-  type Species,
-  RARITY_COLOR,
-  RARITY_GLOW,
-  SPECIES,
-} from "@/types/species";
-import {
   rollAuction,
   applyUpgrade,
   INITIAL_UPGRADES,
@@ -52,7 +41,6 @@ import {
   type UpgradeDef,
   type UpgradeId,
 } from "@/types/upgrades";
-import { SITES, type SiteDef } from "@/types/sites";
 import { ACHIEVEMENTS, type AchievementDef } from "@/types/achievements";
 import { setSeed as setRngSeed, clearSeed, rng, pickInt, seedFromString } from "@/lib/rng";
 import { KingFisherGame } from "@/games/KingFisherGame";
@@ -74,9 +62,7 @@ import { GelGame } from "@/games/GelGame";
 import { GloveBoxGame } from "@/games/GloveBoxGame";
 import { MicroplateGame } from "@/games/MicroplateGame";
 import { TutorialOverlay } from "@/components/TutorialOverlay";
-import { PokedexView } from "@/components/PokedexView";
 import { AuctionView } from "@/components/AuctionView";
-import { SiteMap } from "@/components/SiteMap";
 import { DailyLeaderboard } from "@/components/DailyLeaderboard";
 import { submitDailyScore, loadHandle, saveHandle } from "@/lib/daily-leaderboard";
 
@@ -111,12 +97,10 @@ import type { MicroGameProps } from "@/games/types";
 type Phase =
   | "intro"
   | "daily-board"
-  | "site-select"
   | "stage-intro"
   | "playing"
   | "result"
   | "auction"
-  | "pokedex"
   | "gameover"
   | "practice-menu"
   | "practice-play"
@@ -130,12 +114,10 @@ interface AppState {
   combo: number;
   bestCombo: number;
   currentStage: StageDef | null;
-  currentSiteId: string;
   lastResult: "win" | "fail" | null;
   highScore: number;
   credits: number;
   upgrades: OwnedUpgrades;
-  newSpecies: Species | null;
   auctionOffers: UpgradeDef[];
   showTutorial: boolean;
   // Boss
@@ -146,7 +128,6 @@ interface AppState {
   // Run-scoped tracking
   auctionWinsThisRun: number;
   noContaminationStreak: boolean;
-  sitesVisitedThisRun: Record<string, true>;
   stageWinsThisRun: Record<string, true>;
   // Mode
   isDaily: boolean;
@@ -161,12 +142,10 @@ const INITIAL_STATE: AppState = {
   combo: 0,
   bestCombo: 0,
   currentStage: null,
-  currentSiteId: "tilden",
   lastResult: null,
   highScore: 0,
   credits: 0,
   upgrades: INITIAL_UPGRADES,
-  newSpecies: null,
   auctionOffers: [],
   showTutorial: false,
   isBossWave: false,
@@ -175,7 +154,6 @@ const INITIAL_STATE: AppState = {
   bossWinsThisRun: 0,
   auctionWinsThisRun: 0,
   noContaminationStreak: true,
-  sitesVisitedThisRun: {},
   stageWinsThisRun: {},
   isDaily: false,
   difficulty: DEFAULT_DIFFICULTY,
@@ -207,7 +185,6 @@ const STAGE_TIME_BONUS_MS: Partial<Record<StageId, number>> = {
 function durationForWave(
   wave: number,
   slowWaves: number,
-  siteDifficulty: number,
   isBoss: boolean,
   difficulty: DifficultyId,
   stageId: StageId
@@ -216,9 +193,8 @@ function durationForWave(
   const base = Math.max(2000, 5500 - wave * def.speedupPerWave);
   const withTier = base * def.durationMult;
   const withUpgrade = withTier * (1 + slowWaves * 0.15);
-  const withSite = withUpgrade * siteDifficulty;
   const bossMult = isBoss ? 0.85 : 1;
-  return Math.round(withSite * bossMult) + (STAGE_TIME_BONUS_MS[stageId] ?? 0);
+  return Math.round(withUpgrade * bossMult) + (STAGE_TIME_BONUS_MS[stageId] ?? 0);
 }
 
 function App() {
@@ -228,12 +204,8 @@ function App() {
     showTutorial: !hasSeenTutorial(),
     difficulty: (loadDifficulty() as DifficultyId) ?? DEFAULT_DIFFICULTY,
   }));
-  const [pokedex, setPokedex] = useState<Record<string, number>>(() => loadPokedex());
   const [achievements, setAchievementsState] = useState<Record<string, number>>(
     () => loadAchievements()
-  );
-  const [sitesVisitedAllTime, setSitesVisitedAllTime] = useState<Record<string, number>>(
-    () => loadSitesVisited()
   );
   const [stageWinsAllTime, setStageWinsAllTime] = useState<Record<string, number>>(
     () => loadStageWins()
@@ -276,20 +248,12 @@ function App() {
   }
 
   function checkAchievements(s: AppState, ctx: {
-    species?: Species;
     bossWin?: boolean;
     auctionBuy?: boolean;
-    pokedex?: Record<string, number>;
     stageWins?: Record<string, number>;
-    sitesAllTime?: Record<string, number>;
     dailyEntry?: DailyEntry;
     dailyRank?: number;
   }) {
-    if (ctx.species) {
-      unlockAchievement("first-discovery");
-      if (ctx.species.rarity === "rare") unlockAchievement("rare-find");
-      if (ctx.species.rarity === "legendary") unlockAchievement("legendary");
-    }
     if (s.combo >= 10) unlockAchievement("streak-10");
     if (s.combo >= 25) unlockAchievement("streak-25");
     if (s.wave >= 10 && s.noContaminationStreak) unlockAchievement("clean-w10");
@@ -299,14 +263,8 @@ function App() {
       if (s.bossWinsThisRun + 1 >= 3) unlockAchievement("boss-3");
     }
     if (ctx.auctionBuy && s.auctionWinsThisRun + 1 >= 3) unlockAchievement("auction-3");
-    if (ctx.pokedex && Object.keys(ctx.pokedex).length >= SPECIES.length) {
-      unlockAchievement("field-biologist");
-    }
     if (ctx.stageWins && Object.keys(ctx.stageWins).length >= STAGES.length) {
       unlockAchievement("all-stages");
-    }
-    if (ctx.sitesAllTime && Object.keys(ctx.sitesAllTime).length >= SITES.length) {
-      unlockAchievement("every-site");
     }
     if (ctx.dailyEntry && ctx.dailyRank !== undefined && ctx.dailyRank <= 3) {
       unlockAchievement("daily-podium");
@@ -323,14 +281,21 @@ function App() {
     }
     const tier: DifficultyId = daily ? "grad" : (state.difficulty || DEFAULT_DIFFICULTY);
     const def = difficultyDef(tier);
+    const wave = 1;
+    const isBoss = isBossWaveNumber(wave, def.bossInterval);
+    const chain = isBoss ? pickBossChain(wave) : [];
+    const firstStage = isBoss ? chain[0] : pickStage(wave);
     setState((s) => ({
       ...INITIAL_STATE,
       highScore: s.highScore,
       showTutorial: !hasSeenTutorial() && !daily,
-      phase: "site-select",
-      wave: 1,
+      phase: "stage-intro",
+      wave,
       lives: def.startingLives,
-      currentSiteId: s.currentSiteId,
+      currentStage: firstStage,
+      isBossWave: isBoss,
+      bossChain: chain,
+      bossProgress: 0,
       isDaily: daily,
       difficulty: tier,
     }));
@@ -338,45 +303,35 @@ function App() {
     setTimerKey((k) => k + 1);
   }
 
-  function handleSitePick(siteId: string) {
-    play("click");
-    const site = SITES.find((s) => s.id === siteId) ?? SITES[0];
-    setState((s) => {
-      const sitesVisited = { ...s.sitesVisitedThisRun, [siteId]: true as const };
-      // Track all-time sites
-      const allTime = { ...sitesVisitedAllTime, [siteId]: (sitesVisitedAllTime[siteId] ?? 0) + 1 };
-      saveSitesVisited(allTime);
-      setSitesVisitedAllTime(allTime);
-      checkAchievements({ ...s, sitesVisitedThisRun: sitesVisited }, { sitesAllTime: allTime });
-      // Determine next stage(s)
-      const isBoss = isBossWaveNumber(s.wave, difficultyDef(s.difficulty).bossInterval);
-      if (isBoss) {
-        const chain = pickBossChain(s.wave);
-        return {
-          ...s,
-          currentSiteId: site.id,
-          sitesVisitedThisRun: sitesVisited,
-          phase: "stage-intro",
-          isBossWave: true,
-          bossChain: chain,
-          bossProgress: 0,
-          currentStage: chain[0],
-        };
-      }
-      const stage = pickStage(s.wave);
+  // Roll the next wave's stage(s) and transition into stage-intro.
+  // Used by both the result-overlay's "Next wave →" click and by the
+  // post-auction handlers to keep the wave-advance path consistent.
+  function advanceToNextWave(s: AppState, nextWave: number): AppState {
+    const isBoss = isBossWaveNumber(nextWave, difficultyDef(s.difficulty).bossInterval);
+    if (isBoss) {
+      const chain = pickBossChain(nextWave);
       return {
         ...s,
-        currentSiteId: site.id,
-        sitesVisitedThisRun: sitesVisited,
+        wave: nextWave,
         phase: "stage-intro",
-        isBossWave: false,
-        bossChain: [],
+        isBossWave: true,
+        bossChain: chain,
         bossProgress: 0,
-        currentStage: stage,
+        currentStage: chain[0],
+        lastResult: null,
       };
-    });
-    setSeed((s) => s + 1);
-    setTimerKey((k) => k + 1);
+    }
+    const stage = pickStage(nextWave);
+    return {
+      ...s,
+      wave: nextWave,
+      phase: "stage-intro",
+      isBossWave: false,
+      bossChain: [],
+      bossProgress: 0,
+      currentStage: stage,
+      lastResult: null,
+    };
   }
 
   useEffect(() => {
@@ -412,12 +367,6 @@ function App() {
       );
       const score = s.score + gained;
       const credits = s.credits + (s.isBossWave ? 150 : 50) + s.wave * 5;
-      const site = SITES.find((x) => x.id === s.currentSiteId) ?? SITES[0];
-      const species = rollSpecies(combo, {
-        sitePool: site.speciesPool,
-        rareBoost: site.rareBoost,
-        guaranteedRare: s.isBossWave,
-      });
       // Stage wins (track per stage that was won)
       const stageWinsRun = { ...s.stageWinsThisRun };
       if (s.isBossWave) {
@@ -440,12 +389,10 @@ function App() {
         combo,
         bestCombo: Math.max(s.bestCombo, combo),
         credits,
-        newSpecies: species,
         bossWinsThisRun: s.isBossWave ? s.bossWinsThisRun + 1 : s.bossWinsThisRun,
         stageWinsThisRun: stageWinsRun,
       };
       checkAchievements(next, {
-        species: species ?? undefined,
         bossWin: s.isBossWave,
         stageWins: allTime,
       });
@@ -463,7 +410,6 @@ function App() {
         lastResult: "fail",
         lives,
         combo: 0,
-        newSpecies: null,
         noContaminationStreak: false,
         // Boss fails outright
         isBossWave: false,
@@ -473,58 +419,42 @@ function App() {
     });
   }
 
-  // Add discovered species to pokedex when result phase enters
-  useEffect(() => {
-    if (state.phase !== "result" || !state.newSpecies) return;
-    const sp = state.newSpecies;
-    setPokedex((prev) => {
-      const next = { ...prev, [sp.id]: (prev[sp.id] || 0) + 1 };
-      savePokedex(next);
-      checkAchievements(state, { pokedex: next });
-      return next;
-    });
-    if (sp.rarity === "rare" || sp.rarity === "legendary") {
-      play("rare-discover");
-    } else {
-      play("discover");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, state.newSpecies]);
-
-  // Result → next wave or auction or site-select
+  // Result phase: handle game-over and auction-rolls automatically. The
+  // wave-advance branch is gated on the player clicking the result
+  // overlay's "Next wave →" button via continueFromResult() — there's
+  // no longer a site-select between waves.
   useEffect(() => {
     if (state.phase !== "result") return;
-    const t = setTimeout(() => {
-      setState((s) => {
-        if (s.lives <= 0) return { ...s, phase: "gameover" };
-        // Maybe trigger auction
-        const canAuction =
-          s.lastResult === "win" &&
-          s.wave >= 2 &&
-          rng() < difficultyDef(s.difficulty).auctionProb;
-        if (canAuction) {
-          play("auction");
-          const offers = rollAuction(Math.floor(rng() * 0xffffff), s.upgrades);
-          return { ...s, phase: "auction", auctionOffers: offers, newSpecies: null };
-        }
-        // Otherwise advance to next wave site-select
-        const nextWave = s.wave + 1;
-        return {
+    if (state.lives <= 0) {
+      const t = setTimeout(() => {
+        setState((s) => ({ ...s, phase: "gameover" }));
+      }, 1100);
+      return () => clearTimeout(t);
+    }
+    if (
+      state.lastResult === "win" &&
+      state.wave >= 2 &&
+      rng() < difficultyDef(state.difficulty).auctionProb
+    ) {
+      const t = setTimeout(() => {
+        play("auction");
+        setState((s) => ({
           ...s,
-          phase: "site-select",
-          wave: nextWave,
-          lastResult: null,
-          newSpecies: null,
-          isBossWave: false,
-          bossChain: [],
-          bossProgress: 0,
-        };
-      });
-      setSeed((s) => s + 1);
-      setTimerKey((k) => k + 1);
-    }, 1100);
-    return () => clearTimeout(t);
-  }, [state.phase]);
+          phase: "auction",
+          auctionOffers: rollAuction(Math.floor(rng() * 0xffffff), s.upgrades),
+        }));
+      }, 1100);
+      return () => clearTimeout(t);
+    }
+    // Otherwise the player clicks the "Next wave →" button to advance.
+  }, [state.phase, state.lives, state.lastResult, state.wave, state.difficulty]);
+
+  function continueFromResult() {
+    play("click");
+    setState((s) => advanceToNextWave(s, s.wave + 1));
+    setSeed((x) => x + 1);
+    setTimerKey((k) => k + 1);
+  }
 
   function handleAuctionBuy(id: UpgradeId) {
     setState((s) => {
@@ -536,32 +466,27 @@ function App() {
       if (id === "extra-life" || id === "second-flow-cell") {
         lives = Math.min(lives + 1, 5);
       }
-      const next: AppState = {
-        ...s,
-        credits,
-        upgrades,
-        lives,
-        phase: "site-select",
-        wave: s.wave + 1,
-        auctionOffers: [],
-        lastResult: null,
-        auctionWinsThisRun: s.auctionWinsThisRun + 1,
-      };
       checkAchievements(s, { auctionBuy: true });
-      return next;
+      return advanceToNextWave(
+        {
+          ...s,
+          credits,
+          upgrades,
+          lives,
+          auctionOffers: [],
+          auctionWinsThisRun: s.auctionWinsThisRun + 1,
+        },
+        s.wave + 1,
+      );
     });
     setSeed((s) => s + 1);
     setTimerKey((k) => k + 1);
   }
 
   function handleAuctionSkip() {
-    setState((s) => ({
-      ...s,
-      phase: "site-select",
-      wave: s.wave + 1,
-      auctionOffers: [],
-      lastResult: null,
-    }));
+    setState((s) =>
+      advanceToNextWave({ ...s, auctionOffers: [] }, s.wave + 1),
+    );
     setSeed((s) => s + 1);
     setTimerKey((k) => k + 1);
   }
@@ -658,14 +583,6 @@ function App() {
     setTimerKey((k) => k + 1);
   }
 
-  function openPokedex() {
-    play("click");
-    setState((s) => ({ ...s, phase: "pokedex" }));
-  }
-  function closePokedex() {
-    play("click");
-    setState((s) => ({ ...s, phase: "intro" }));
-  }
   function openDailyBoard() {
     play("click");
     setState((s) => ({ ...s, phase: "daily-board" }));
@@ -732,24 +649,6 @@ function App() {
   }
 
   // ---- Routing ----
-  if (state.phase === "pokedex") {
-    return (
-      <>
-        <PokedexView
-          pokedex={pokedex}
-          onClose={closePokedex}
-          achievements={achievements}
-        />
-        {pendingAchievements[0] && (
-          <AchievementToast
-            achievement={pendingAchievements[0]}
-            onDone={dismissPendingAchievement}
-          />
-        )}
-      </>
-    );
-  }
-
   if (state.phase === "daily-board") {
     const date = todayKey();
     return (
@@ -800,13 +699,11 @@ function App() {
       <>
         <IntroScreen
           highScore={state.highScore}
-          pokedexCount={Object.keys(pokedex).length}
           achievementCount={Object.keys(achievements).length}
           muted={muted}
           difficulty={state.difficulty}
           onSetDifficulty={setDifficulty}
           onStart={() => startGame(false)}
-          onOpenPokedex={openPokedex}
           onOpenDaily={openDailyBoard}
           onOpenPractice={openPractice}
           onToggleMute={toggleMute}
@@ -840,11 +737,9 @@ function App() {
           wave={state.wave}
           bestCombo={state.bestCombo}
           highScore={state.highScore}
-          pokedexCount={Object.keys(pokedex).length}
           isDaily={state.isDaily}
           difficulty={state.difficulty}
           onRestart={() => startGame(state.isDaily)}
-          onOpenPokedex={openPokedex}
           onOpenDaily={state.isDaily ? openDailyBoard : undefined}
           onHome={() => setState((s) => ({ ...s, phase: "intro" }))}
         />
@@ -917,27 +812,6 @@ function App() {
     );
   }
 
-  if (state.phase === "site-select") {
-    // Highest unlocked wave: use highScore wave or current wave
-    const highestWave = Math.max(state.wave, state.bestCombo, 0);
-    return (
-      <>
-        <SiteMap
-          highestWave={highestWave}
-          currentSiteId={state.currentSiteId}
-          onPick={handleSitePick}
-          countdownSec={state.wave === 1 ? 6 : 4}
-        />
-        {pendingAchievements[0] && (
-          <AchievementToast
-            achievement={pendingAchievements[0]}
-            onDone={dismissPendingAchievement}
-          />
-        )}
-      </>
-    );
-  }
-
   return (
     <>
       <GameViewStable
@@ -949,6 +823,7 @@ function App() {
         onFail={handleFail}
         onToggleMute={toggleMute}
         onDismissTutorial={dismissTutorial}
+        onContinueFromResult={continueFromResult}
       />
       {pendingAchievements[0] && (
         <AchievementToast
@@ -984,6 +859,7 @@ function GameViewStable(props: {
   onFail: () => void;
   onToggleMute: () => void;
   onDismissTutorial: () => void;
+  onContinueFromResult: () => void;
 }) {
   const stableWin = useStableCallback(props.onWin);
   const stableFail = useStableCallback(props.onFail);
@@ -997,31 +873,28 @@ function GameViewStable(props: {
       onFail={stableFail}
       onToggleMute={props.onToggleMute}
       onDismissTutorial={props.onDismissTutorial}
+      onContinueFromResult={props.onContinueFromResult}
     />
   );
 }
 
 function IntroScreen({
   highScore,
-  pokedexCount,
   achievementCount,
   muted,
   difficulty,
   onSetDifficulty,
   onStart,
-  onOpenPokedex,
   onOpenDaily,
   onOpenPractice,
   onToggleMute,
 }: {
   highScore: number;
-  pokedexCount: number;
   achievementCount: number;
   muted: boolean;
   difficulty: DifficultyId;
   onSetDifficulty: (id: DifficultyId) => void;
   onStart: () => void;
-  onOpenPokedex: () => void;
   onOpenDaily: () => void;
   onOpenPractice: () => void;
   onToggleMute: () => void;
@@ -1145,12 +1018,6 @@ function IntroScreen({
         </div>
 
         <div className="mt-8 flex items-center justify-center gap-6 flex-wrap">
-          <button
-            onClick={onOpenPokedex}
-            className="text-xs uppercase tracking-widest text-white/60 hover:text-cyan-400"
-          >
-            Pokedex · {pokedexCount}
-          </button>
           {achievementCount > 0 && (
             <span className="text-xs font-mono text-amber-300/80 uppercase tracking-widest">
               ★ {achievementCount}
@@ -1179,11 +1046,9 @@ function GameOverScreen({
   wave,
   bestCombo,
   highScore,
-  pokedexCount,
   isDaily,
   difficulty,
   onRestart,
-  onOpenPokedex,
   onOpenDaily,
   onHome,
 }: {
@@ -1191,11 +1056,9 @@ function GameOverScreen({
   wave: number;
   bestCombo: number;
   highScore: number;
-  pokedexCount: number;
   isDaily: boolean;
   difficulty: DifficultyId;
   onRestart: () => void;
-  onOpenPokedex: () => void;
   onOpenDaily?: () => void;
   onHome: () => void;
 }) {
@@ -1255,16 +1118,13 @@ function GameOverScreen({
           </button>
         </div>
 
-        <div className="mt-4 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-white/60">
-          {isDaily && onOpenDaily && (
+        {isDaily && onOpenDaily && (
+          <div className="mt-4 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-white/60">
             <button onClick={onOpenDaily} className="hover:text-amber-300">
               View board
             </button>
-          )}
-          <button onClick={onOpenPokedex} className="hover:text-cyan-400">
-            Pokedex · {pokedexCount}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1290,6 +1150,7 @@ function GameView({
   onFail,
   onToggleMute,
   onDismissTutorial,
+  onContinueFromResult,
 }: {
   state: AppState;
   seed: number;
@@ -1299,14 +1160,13 @@ function GameView({
   onFail: () => void;
   onToggleMute: () => void;
   onDismissTutorial: () => void;
+  onContinueFromResult: () => void;
 }) {
   const stage = state.currentStage!;
   const palette = paletteFor(stage);
-  const site = SITES.find((s) => s.id === state.currentSiteId) ?? SITES[0];
   const duration = durationForWave(
     state.wave,
     state.upgrades.slowWaves,
-    site.difficulty,
     state.isBossWave,
     state.difficulty,
     stage.id
@@ -1319,11 +1179,22 @@ function GameView({
 
   const maxLives = 3 + state.upgrades.extraLife;
 
+  // Show "Next wave" continue button only on plain wave-advance —
+  // gameover and auction transitions are handled automatically by the
+  // result-phase useEffect in App.
+  const showContinue =
+    state.phase === "result" &&
+    state.lives > 0 &&
+    !(
+      state.lastResult === "win" &&
+      state.wave >= 2 &&
+      false // auction roll happens in App; if it fires, phase will move to "auction" and we won't show the button anyway
+    );
+
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white flex flex-col">
       <Hud
         state={state}
-        site={site}
         maxLives={maxLives}
         muted={muted}
         onToggleMute={onToggleMute}
@@ -1366,8 +1237,11 @@ function GameView({
         {state.phase === "result" && (
           <ResultOverlay
             result={state.lastResult!}
-            newSpecies={state.newSpecies}
             isBossWin={state.lastResult === "win" && state.isBossWave}
+            wave={state.wave}
+            score={state.score}
+            showContinue={showContinue}
+            onContinue={onContinueFromResult}
           />
         )}
       </div>
@@ -1377,13 +1251,11 @@ function GameView({
 
 function Hud({
   state,
-  site,
   maxLives,
   muted,
   onToggleMute,
 }: {
   state: AppState;
-  site: SiteDef;
   maxLives: number;
   muted: boolean;
   onToggleMute: () => void;
@@ -1414,17 +1286,6 @@ function Hud({
             <p className="font-mono text-sm text-cyan-400">{state.credits}c</p>
           </div>
         )}
-        <div className="hidden sm:block">
-          <p className="text-[9px] uppercase tracking-widest text-white/40">
-            Site
-          </p>
-          <p
-            className="font-mono text-xs"
-            style={{ color: site.color }}
-          >
-            {site.short}
-          </p>
-        </div>
         {state.isDaily && (
           <div className="text-amber-300">
             <p className="text-[9px] uppercase tracking-widest opacity-70">Mode</p>
@@ -1563,12 +1424,18 @@ function TimerBar({ duration, hex }: { duration: number; hex: string }) {
 
 function ResultOverlay({
   result,
-  newSpecies,
   isBossWin,
+  wave,
+  score,
+  showContinue,
+  onContinue,
 }: {
   result: "win" | "fail";
-  newSpecies: Species | null;
   isBossWin: boolean;
+  wave: number;
+  score: number;
+  showContinue: boolean;
+  onContinue: () => void;
 }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-[#0a0e1a]/85 backdrop-blur-sm z-50">
@@ -1590,27 +1457,6 @@ function ResultOverlay({
                 </p>
               </>
             )}
-            {newSpecies && (
-              <div
-                className="mt-5 mx-auto inline-flex flex-col items-center gap-1 px-5 py-3 rounded-lg border animate-[fadeIn_0.4s_ease-out]"
-                style={{
-                  borderColor: `${RARITY_COLOR[newSpecies.rarity]}80`,
-                  background: `${RARITY_COLOR[newSpecies.rarity]}15`,
-                  boxShadow: `0 0 30px ${RARITY_GLOW[newSpecies.rarity]}`,
-                }}
-              >
-                <p
-                  className="text-[10px] uppercase tracking-[0.3em]"
-                  style={{ color: RARITY_COLOR[newSpecies.rarity] }}
-                >
-                  {newSpecies.rarity} discovery
-                </p>
-                <p className="text-base font-light">{newSpecies.name}</p>
-                <p className="text-[11px] italic text-white/50">
-                  {newSpecies.latin}
-                </p>
-              </div>
-            )}
           </>
         ) : (
           <>
@@ -1619,6 +1465,20 @@ function ResultOverlay({
               contaminated
             </p>
           </>
+        )}
+        {wave > 0 && (
+          <div className="mt-5 flex justify-center gap-6 text-[10px] uppercase tracking-[0.3em] text-white/55">
+            <span>Wave {wave}</span>
+            <span className="font-mono text-white/80">{score.toLocaleString()} pts</span>
+          </div>
+        )}
+        {showContinue && (
+          <button
+            onClick={onContinue}
+            className="mt-6 bg-cyan-400 text-[#0a0e1a] font-bold px-8 py-3 rounded hover:bg-cyan-300 transition-colors uppercase tracking-widest text-sm shadow-[0_0_30px_rgba(34,211,238,0.4)] animate-[fadeIn_0.4s_ease-out]"
+          >
+            Next wave →
+          </button>
         )}
       </div>
       <style>{`
@@ -1821,8 +1681,11 @@ function PracticeView({
         {state.phase === "practice-result" && (
           <ResultOverlay
             result={state.lastResult!}
-            newSpecies={null}
             isBossWin={false}
+            wave={0}
+            score={0}
+            showContinue={false}
+            onContinue={() => {}}
           />
         )}
       </div>
