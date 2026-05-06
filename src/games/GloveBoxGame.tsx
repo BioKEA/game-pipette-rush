@@ -100,10 +100,10 @@ export function GloveBoxGame({ duration, seed, onSuccess, onFail }: MicroGamePro
       </div>
 
       <div
-        className="relative bg-black/40 border-2 border-slate-300/30 rounded-lg overflow-hidden cursor-none"
+        className="relative bg-black/40 border-2 border-slate-300/30 rounded-lg overflow-hidden cursor-none touch-none"
         style={{ width: "min(560px, 90vw)", aspectRatio: "5/3" }}
         onPointerMove={handleMove}
-        onClick={handleClick}
+        onPointerDown={handleClick}
       >
         {/* Glove port outlines */}
         <div className="absolute top-1/2 -translate-y-1/2 left-2 h-20 w-20 rounded-full border border-slate-300/20" />

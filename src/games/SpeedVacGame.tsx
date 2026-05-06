@@ -94,8 +94,8 @@ export function SpeedVacGame({ duration, onSuccess, onFail }: MicroGameProps) {
 
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center justify-center px-6 select-none"
-      onClick={stopVac}
+      className="absolute inset-0 flex flex-col items-center justify-center px-6 select-none touch-none"
+      onPointerDown={stopVac}
     >
       <div className="absolute top-3 left-0 right-0 text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-teal-400/70">

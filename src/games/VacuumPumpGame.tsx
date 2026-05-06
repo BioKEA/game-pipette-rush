@@ -90,8 +90,8 @@ export function VacuumPumpGame({ duration, onSuccess, onFail }: MicroGameProps) 
 
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center justify-center px-6 select-none"
-      onClick={pump}
+      className="absolute inset-0 flex flex-col items-center justify-center px-6 select-none touch-none"
+      onPointerDown={pump}
     >
       <div className="absolute top-3 left-0 right-0 text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-sky-400/70">
