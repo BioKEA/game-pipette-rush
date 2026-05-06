@@ -20,6 +20,7 @@ interface Props {
 export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
   const [handle, setHandleState] = useState<string | null>(() => loadHandle());
   const [draftHandle, setDraftHandle] = useState("");
+  const [editingHandle, setEditingHandle] = useState(false);
   const [view, setView] = useState<LeaderboardWindow>("today");
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -109,30 +110,57 @@ export function DailyLeaderboard({ date, yourEntry, onStart, onClose }: Props) {
           ))}
         </div>
 
-        {!handle && (
+        {(!handle || editingHandle) ? (
           <div className="bg-amber-300/10 border border-amber-300/30 rounded-lg p-4 mb-4">
             <p className="text-[10px] uppercase tracking-[0.3em] text-amber-300 mb-2">
-              Pick a handle
+              {handle ? "Edit handle" : "Pick a handle"}
             </p>
-            <p className="text-xs text-white/60 mb-3">
-              Used on the leaderboard. Letters, numbers, _ and -. Up to 16 chars.
-            </p>
+            {!handle && (
+              <p className="text-xs text-white/60 mb-3">
+                Used on the leaderboard. Letters, numbers, _ and -. Up to 16 chars.
+              </p>
+            )}
             <div className="flex gap-2">
               <input
                 value={draftHandle}
                 onChange={(e) => setDraftHandle(sanitizeHandle(e.target.value))}
-                placeholder="handle"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && sanitizeHandle(draftHandle)) { e.preventDefault(); commitHandle(); setEditingHandle(false); }
+                  if (e.key === "Escape") { e.preventDefault(); setEditingHandle(false); }
+                }}
+                placeholder={handle ?? "handle"}
                 className="flex-1 bg-black/40 border border-white/20 rounded px-3 py-2 text-sm font-mono text-white placeholder-white/30 focus:outline-none focus:border-amber-300"
                 maxLength={16}
+                autoFocus={editingHandle}
               />
               <button
-                onClick={commitHandle}
+                onClick={() => { commitHandle(); setEditingHandle(false); }}
                 disabled={!sanitizeHandle(draftHandle)}
                 className="bg-amber-300 text-[#0a0e1a] font-semibold px-4 py-2 rounded text-sm uppercase tracking-wider disabled:opacity-30"
               >
                 Save
               </button>
+              {editingHandle && (
+                <button
+                  onClick={() => setEditingHandle(false)}
+                  className="text-white/50 hover:text-white px-3 py-2 rounded text-sm border border-white/10"
+                >
+                  ✕
+                </button>
+              )}
             </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mb-4 px-1">
+            <span className="text-[10px] uppercase tracking-[0.25em] text-white/40 font-mono">
+              playing as <span className="text-amber-300/80">{handle}</span>
+            </span>
+            <button
+              onClick={() => { setDraftHandle(handle ?? ""); setEditingHandle(true); }}
+              className="text-[9px] uppercase tracking-[0.15em] text-white/30 hover:text-amber-300 transition-colors"
+            >
+              ✎ edit
+            </button>
           </div>
         )}
 

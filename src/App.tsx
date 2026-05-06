@@ -1007,7 +1007,7 @@ function IntroScreen({
             onClick={onOpenDaily}
             className="text-xs uppercase tracking-[0.3em] text-amber-300 hover:text-amber-200 px-6 py-3 border border-amber-300/40 hover:border-amber-300/80 rounded-lg"
           >
-            ◇ Daily seed
+            ◇ Daily · Leaderboard
           </button>
           <button
             onClick={onOpenPractice}
@@ -1119,11 +1119,12 @@ function GameOverScreen({
         </div>
 
         {isDaily && onOpenDaily && (
-          <div className="mt-4 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-white/60">
-            <button onClick={onOpenDaily} className="hover:text-amber-300">
-              View board
-            </button>
-          </div>
+          <button
+            onClick={onOpenDaily}
+            className="mt-3 w-full text-xs uppercase tracking-[0.3em] text-amber-300 hover:text-amber-200 py-3 border border-amber-300/30 hover:border-amber-300/60 rounded"
+          >
+            ◇ View Leaderboard
+          </button>
         )}
       </div>
     </div>

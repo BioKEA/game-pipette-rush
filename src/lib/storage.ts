@@ -119,17 +119,9 @@ export function saveDailyBest(entries: Record<string, DailyEntry>) {
 }
 
 export function todayKey(): string {
-  // Local-timezone date so the seed matches the central leaderboard
-  // panel on biokea.ai/mission/games/, which builds its `day` from
-  // `new Date()` getters (also local). Using toISOString() here was
-  // returning UTC dates — for users west of UTC, scores submitted
-  // after ~5pm local were filed under tomorrow's seed and the panel
-  // (querying today's seed) never found them.
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  // UTC date — matches the website leaderboard page (biokea.ai/mission/games/leaderboard)
+  // which also uses UTC. All games use UTC so seeds are consistent regardless of timezone.
+  return new Date().toISOString().slice(0, 10);
 }
 
 export interface PracticeStat {
