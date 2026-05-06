@@ -1,4 +1,5 @@
 const HIGH_SCORE_KEY = "ldc-high-score";
+const BEST_WAVE_KEY = "ldc-best-wave";
 const TUTORIAL_KEY = "ldc-tutorial-seen";
 const MUTED_KEY = "ldc-muted";
 const ACHIEVEMENTS_KEY = "ldc-achievements";
@@ -20,6 +21,23 @@ export function loadHighScore(): number {
 export function saveHighScore(score: number) {
   try {
     localStorage.setItem(HIGH_SCORE_KEY, String(score));
+  } catch {
+    // ignore
+  }
+}
+
+export function loadBestWave(): number {
+  try {
+    const v = localStorage.getItem(BEST_WAVE_KEY);
+    return v ? parseInt(v, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveBestWave(wave: number) {
+  try {
+    localStorage.setItem(BEST_WAVE_KEY, String(wave));
   } catch {
     // ignore
   }

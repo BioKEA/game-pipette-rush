@@ -6,6 +6,8 @@ import { useStableCallback } from "@/lib/useStable";
 import {
   loadHighScore,
   saveHighScore,
+  loadBestWave,
+  saveBestWave,
   hasSeenTutorial,
   markTutorialSeen,
   loadMuted,
@@ -122,6 +124,7 @@ interface AppState {
   currentStage: StageDef | null;
   lastResult: "win" | "fail" | null;
   highScore: number;
+  bestWave: number;
   credits: number;
   upgrades: OwnedUpgrades;
   auctionOffers: UpgradeDef[];
@@ -150,6 +153,7 @@ const INITIAL_STATE: AppState = {
   currentStage: null,
   lastResult: null,
   highScore: 0,
+  bestWave: 0,
   credits: 0,
   upgrades: INITIAL_UPGRADES,
   auctionOffers: [],
@@ -165,16 +169,20 @@ const INITIAL_STATE: AppState = {
   difficulty: DEFAULT_DIFFICULTY,
 };
 
-function pickStage(wave: number): StageDef {
-  const idx = pickInt(Math.min(wave + 1, STAGES.length));
-  return STAGES[Math.min(idx, STAGES.length - 1)];
+function pickStage(_wave: number): StageDef {
+  // Full uniform-random across every stage. Earlier this was bounded
+  // by wave count (`pickInt(min(wave+1, STAGES.length))`) which biased
+  // every early run toward the first one or two stages — players saw
+  // the same micro-game over and over before stage variety unlocked.
+  // Difficulty ramps via `durationForWave` (timer compresses per
+  // wave) rather than through stage gating.
+  return STAGES[pickInt(STAGES.length)];
 }
 
-function pickBossChain(wave: number): StageDef[] {
+function pickBossChain(_wave: number): StageDef[] {
   const out: StageDef[] = [];
-  const max = Math.min(wave + 2, STAGES.length);
   for (let i = 0; i < 3; i++) {
-    out.push(STAGES[pickInt(max)]);
+    out.push(STAGES[pickInt(STAGES.length)]);
   }
   return out;
 }
@@ -207,6 +215,7 @@ function App() {
   const [state, setState] = useState<AppState>(() => ({
     ...INITIAL_STATE,
     highScore: loadHighScore(),
+    bestWave: loadBestWave(),
     showTutorial: !hasSeenTutorial(),
     difficulty: (loadDifficulty() as DifficultyId) ?? DEFAULT_DIFFICULTY,
   }));
@@ -562,6 +571,12 @@ function App() {
         setState((s) => ({ ...s, highScore: s.score }));
       }
     }
+    // Track lifetime max wave separately from high score so the intro
+    // can surface "best wave · N" alongside "best · score".
+    if (state.wave > state.bestWave) {
+      saveBestWave(state.wave);
+      setState((s) => ({ ...s, bestWave: s.wave }));
+    }
     clearSeed();
     // Run-end CTA: after 3 gameovers this session, prompt support — once per 7 days
     sessionRunsRef.current += 1;
@@ -705,6 +720,7 @@ function App() {
       <>
         <IntroScreen
           highScore={state.highScore}
+          bestWave={state.bestWave}
           achievementCount={Object.keys(achievements).length}
           muted={muted}
           difficulty={state.difficulty}
@@ -886,6 +902,7 @@ function GameViewStable(props: {
 
 function IntroScreen({
   highScore,
+  bestWave,
   achievementCount,
   muted,
   difficulty,
@@ -896,6 +913,7 @@ function IntroScreen({
   onToggleMute,
 }: {
   highScore: number;
+  bestWave: number;
   achievementCount: number;
   muted: boolean;
   difficulty: DifficultyId;
@@ -1032,6 +1050,11 @@ function IntroScreen({
           {highScore > 0 && (
             <span className="text-xs font-mono text-white/40 uppercase tracking-widest">
               best · {highScore.toLocaleString()}
+            </span>
+          )}
+          {bestWave > 0 && (
+            <span className="text-xs font-mono text-white/40 uppercase tracking-widest">
+              max wave · {bestWave}
             </span>
           )}
         </div>
