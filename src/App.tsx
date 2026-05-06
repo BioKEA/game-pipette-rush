@@ -65,6 +65,7 @@ import { TutorialOverlay } from "@/components/TutorialOverlay";
 import { AuctionView } from "@/components/AuctionView";
 import { DailyLeaderboard } from "@/components/DailyLeaderboard";
 import { submitDailyScore, loadHandle, saveHandle } from "@/lib/daily-leaderboard";
+import { tryClaimGoldenSample } from "@/lib/golden-sample";
 
 // Wraps submitDailyScore with a toast so the player sees whether the
 // score actually landed. Without this, network or RLS failures look
@@ -78,6 +79,11 @@ async function submitWithToast(args: Parameters<typeof submitDailyScore>[0]) {
         id,
         description: "View it at biokea.ai/mission/games/leaderboard",
       });
+      // Golden Sample 26: every successful daily submission is a
+      // potential 12th run — let the server decide. No-op if the
+      // ticket is already held or the threshold isn't met.
+      // I won't tell. That would be cheating.
+      void tryClaimGoldenSample(args.handle);
     } else {
       toast.error(`Couldn't post score: ${res.error}`, { id });
     }
