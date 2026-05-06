@@ -81,11 +81,12 @@ async function submitWithToast(args: Parameters<typeof submitDailyScore>[0]) {
         id,
         description: "View it at biokea.ai/mission/games/leaderboard",
       });
-      // Golden Sample 26: every successful daily submission is a
-      // potential 12th run — let the server decide. No-op if the
-      // ticket is already held or the threshold isn't met.
+      // Golden Sample 26: pass the run's wave so the helper only
+      // attempts the claim if THIS run met the wave threshold —
+      // otherwise the reveal could fire on a 5-wave loss when a
+      // long-ago run was the actual qualifier.
       // I won't tell. That would be cheating.
-      void tryClaimGoldenSample(args.handle);
+      void tryClaimGoldenSample({ handle: args.handle, wave: args.wave });
     } else {
       toast.error(`Couldn't post score: ${res.error}`, { id });
     }

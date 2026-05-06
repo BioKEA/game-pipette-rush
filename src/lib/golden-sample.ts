@@ -68,12 +68,24 @@ interface GoldenFoundDetail {
   sentence: string;
 }
 
-// Fire-and-forget. Safe to call after every successful submit — the
-// server is the oracle for whether the threshold is met. Returns
-// silently if the player hasn't earned it yet.
-export async function tryClaimGoldenSample(handle?: string): Promise<void> {
+// Threshold is single-run wave count. The server validator accepts
+// any historical row that meets the threshold — which means a player
+// who hit wave 15 LAST WEEK would unlock on their first 5-wave run
+// today, regardless of in-run signal. Gate at the call site so the
+// reveal only fires on the actual qualifying run.
+const SLOT_THRESHOLD_WAVE = 15;
+
+// Fire-and-forget. Pass the wave the current run reached; the helper
+// only POSTs the claim if the run actually met the threshold. The
+// server is still the source of truth (it cross-checks the score row)
+// but this prevents the misleading "you did it!" animation after a
+// short run when a much earlier run was the real qualifier.
+export async function tryClaimGoldenSample(
+  args: { handle?: string; wave?: number } = {},
+): Promise<void> {
   if (alreadyHeld()) return;
-  const h = handle ?? readHandle();
+  if (typeof args.wave === 'number' && args.wave < SLOT_THRESHOLD_WAVE) return;
+  const h = args.handle ?? readHandle();
   if (!h) return;
   let res: Response;
   try {
