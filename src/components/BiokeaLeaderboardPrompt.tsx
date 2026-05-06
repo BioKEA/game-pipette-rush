@@ -191,6 +191,13 @@ export function BiokeaLeaderboardPrompt(props: BiokeaLeaderboardPromptProps) {
 
   function skip() {
     if (props.onSkip) {
+      // If the player typed a valid handle but chose to skip the
+      // email step, persist the handle anyway. Without this, App-level
+      // onSkip handlers that fall back to `loadHandle()` find nothing
+      // and silently drop the score — the caller's "still post if a
+      // handle is stored" recovery loses the run.
+      const h = sanitizeHandle(handle)
+      if (HANDLE_REGEX.test(h)) saveCrossGameHandle(h)
       markSessionSkipped()
       props.onSkip()
     }

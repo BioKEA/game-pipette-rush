@@ -303,6 +303,11 @@ function App() {
     setState((s) => ({
       ...INITIAL_STATE,
       highScore: s.highScore,
+      // Preserve the lifetime max-wave across runs — without this, the
+      // gameover handler compares state.wave to a freshly-zeroed
+      // state.bestWave and overwrites the persisted lifetime high-water
+      // mark with whatever the current run hit.
+      bestWave: s.bestWave,
       showTutorial: !hasSeenTutorial() && !daily,
       phase: "stage-intro",
       wave,
@@ -799,6 +804,9 @@ function App() {
               setBiokeaPromptOpen(false);
               // Still post if a handle is already stored — Skip means
               // "skip the email step", not "skip the leaderboard".
+              // The prompt now persists any typed-but-not-submitted
+              // handle on Skip, so loadHandle() will find it even
+              // when the player didn't formally hit Submit.
               const existing = loadHandle();
               if (existing && biokeaPromptScore.score > 0 && biokeaPromptScore.date) {
                 void submitWithToast({
@@ -806,6 +814,14 @@ function App() {
                   handle: existing,
                   score: biokeaPromptScore.score,
                   wave: biokeaPromptScore.wave,
+                });
+              } else if (biokeaPromptScore.score > 0) {
+                // Score earned but no handle anywhere — surface a
+                // message so the player knows the run isn't on the
+                // board (was a silent drop before this fix).
+                toast.warning("Score not saved — no handle set", {
+                  description:
+                    "Re-open the leaderboard prompt next run to pick a handle.",
                 });
               }
             }}
