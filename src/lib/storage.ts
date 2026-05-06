@@ -119,8 +119,10 @@ export function saveDailyBest(entries: Record<string, DailyEntry>) {
 }
 
 export function todayKey(): string {
-  // UTC date — matches the website leaderboard page (biokea.ai/mission/games/leaderboard)
-  // which also uses UTC. All games use UTC so seeds are consistent regardless of timezone.
+  // UTC so every game in the BioKEA suite agrees on which day "today"
+  // is. Codon Collider has always seeded daily mode in UTC and the
+  // central /mission/games/leaderboard page also reads UTC. Using local
+  // time here produced silent score misses for users west of UTC.
   return new Date().toISOString().slice(0, 10);
 }
 
