@@ -170,20 +170,38 @@ const INITIAL_STATE: AppState = {
   difficulty: DEFAULT_DIFFICULTY,
 };
 
+// Shuffled-bag stage distribution. Uniform random pickInt() is fair
+// in expectation but feels biased over short runs — with 18 stages and
+// a 12-wave run, players consistently hit some stages 2-3× and others
+// not at all (player feedback: "begin run waves seem biased toward
+// some games more than others"). A bag exhausts every stage once
+// before any repeat, so over a 12-wave run the player is guaranteed
+// 12 distinct stages. resetStageBag() is called from startGame so
+// each run starts with a fresh shuffle.
+let _stageBag: StageDef[] = [];
+function resetStageBag(): void {
+  _stageBag = [];
+}
 function pickStage(_wave: number): StageDef {
-  // Full uniform-random across every stage. Earlier this was bounded
-  // by wave count (`pickInt(min(wave+1, STAGES.length))`) which biased
-  // every early run toward the first one or two stages — players saw
-  // the same micro-game over and over before stage variety unlocked.
-  // Difficulty ramps via `durationForWave` (timer compresses per
-  // wave) rather than through stage gating.
-  return STAGES[pickInt(STAGES.length)];
+  if (_stageBag.length === 0) {
+    // Fisher-Yates shuffle, drawing from the seeded rng so daily runs
+    // are deterministic per day.
+    _stageBag = STAGES.slice();
+    for (let i = _stageBag.length - 1; i > 0; i--) {
+      const j = pickInt(i + 1);
+      [_stageBag[i], _stageBag[j]] = [_stageBag[j], _stageBag[i]];
+    }
+  }
+  return _stageBag.pop() as StageDef;
 }
 
 function pickBossChain(_wave: number): StageDef[] {
+  // Boss chain pulls from the same bag so the boss can't immediately
+  // repeat a stage the player just played. Fall back to fresh picks
+  // if the bag would empty mid-chain.
   const out: StageDef[] = [];
   for (let i = 0; i < 3; i++) {
-    out.push(STAGES[pickInt(STAGES.length)]);
+    out.push(pickStage(0));
   }
   return out;
 }
@@ -295,6 +313,9 @@ function App() {
     } else {
       clearSeed();
     }
+    // New run starts with a fresh stage bag so every run guarantees
+    // distinct stages until all 18 have appeared.
+    resetStageBag();
     const tier: DifficultyId = daily ? "grad" : (state.difficulty || DEFAULT_DIFFICULTY);
     const def = difficultyDef(tier);
     const wave = 1;
