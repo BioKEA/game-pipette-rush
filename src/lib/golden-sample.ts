@@ -65,7 +65,6 @@ interface GoldenFoundDetail {
   token?: string;
   issued_at?: string;
   alreadyHeld: boolean;
-  sentence: string;
 }
 
 // Threshold is single-run wave count. The server validator accepts
@@ -114,7 +113,6 @@ export async function tryClaimGoldenSample(
     token: body.token,
     issued_at: body.issued_at,
     alreadyHeld: !body.first_earn,
-    sentence: "Every Human Now Has Scientific Superpowers",
   };
   window.dispatchEvent(
     new CustomEvent<GoldenFoundDetail>("biokea:golden-found", { detail }),
