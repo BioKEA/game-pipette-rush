@@ -70,14 +70,11 @@ interface GoldenFoundDetail {
 
 // Threshold is single-run wave count. The server validator accepts
 // any historical row that meets the threshold — which means a player
-// who hit wave 15 LAST WEEK would unlock on their first 5-wave run
+// who hit wave 12 LAST WEEK would unlock on their first 5-wave run
 // today, regardless of in-run signal. Gate at the call site so the
-// reveal only fires on the actual qualifying run.
-//
-// TEMPORARY: lowered to 3 to make end-to-end testing of the hunt
-// leaderboard fast. Bump back to 15 once testing wraps. Mirror change
-// in website-biokea/src/lib/golden-sample/config.ts:SLOTS[0].threshold.
-const SLOT_THRESHOLD_WAVE = 3;
+// reveal only fires on the actual qualifying run. Mirror change in
+// website-biokea/src/lib/golden-sample/config.ts:SLOTS[0].threshold.
+const SLOT_THRESHOLD_WAVE = 12;
 
 // Fire-and-forget. Pass the wave the current run reached; the helper
 // only POSTs the claim if the run actually met the threshold. The
