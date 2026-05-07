@@ -714,6 +714,7 @@ function App() {
       <>
         <PracticeMenu
           stats={practiceStats}
+          rankedWins={stageWinsAllTime}
           onPick={startPracticeStage}
           onClose={closePractice}
         />
