@@ -79,7 +79,7 @@ async function submitWithToast(args: Parameters<typeof submitDailyScore>[0]) {
     if (res.ok) {
       toast.success("Posted to leaderboard", {
         id,
-        description: "View it at biokea.ai/mission/games/leaderboard",
+        description: "View it at games.biokea.ai/leaderboard",
       });
       // Golden Sample 26: pass the run's wave so the helper only
       // attempts the claim if THIS run met the wave threshold —
